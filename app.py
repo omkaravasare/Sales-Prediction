@@ -30,7 +30,7 @@ if uploaded_file is not None:
 
     # ✅ Data Preprocessing
     st.subheader("⚙️ Data Preprocessing...")
-    time.sleep(1)  # Small sleep to show processing step
+    time.sleep(1)  
     
     # Remove unwanted columns
     df.drop(['User_ID', 'Product_ID'], axis=1, inplace=True)
@@ -57,12 +57,17 @@ if uploaded_file is not None:
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
-    # ✅ Background Model Training Without Lag
-    with st.spinner("🤖 Training The Model In Background... Please Wait 5-10 seconds..."):
-        model = XGBRegressor(n_estimators=1000, learning_rate=0.05, max_depth=10)
+    # ✅ 🚀 SUPER FAST MODEL TRAINING (NO FREEZE NOW)
+    with st.spinner("🤖 Training The Model In Background... Please Wait 2 Seconds..."):
+        model = XGBRegressor(
+            n_estimators=100,    # **MAJOR FIX HERE** 🔥
+            learning_rate=0.1,   # **MAJOR FIX HERE** 🔥
+            max_depth=5,         # **MAJOR FIX HERE** 🔥
+            n_jobs=-1,           # ✅ Utilize maximum processing power
+        )
         model.fit(X_scaled, y)
         time.sleep(1)
-    st.success("✅ Model Trained Successfully! 🚀")
+    st.success("✅ Model Trained Successfully! 🚀 (In Just 2 Seconds!)")
 
     # ✅ Predictions
     y_pred = model.predict(X_scaled)
