@@ -26,7 +26,7 @@ if uploaded_file is not None:
     # --------------------------
     # Preprocessing
     # --------------------------
-    df.drop(['User_ID', 'Product_ID'], axis=1, inplace=True)
+    df.drop(['User_ID', 'Product_ID'], axis=1, inplace=True, errors='ignore')
 
     # Encode Categorical Variables
     label_encoder = LabelEncoder()
@@ -44,12 +44,14 @@ if uploaded_file is not None:
     if date_column:
         df[date_column] = pd.to_datetime(df[date_column], errors='coerce')
         df['Year'] = df[date_column].dt.year
-        latest_year = df['Year'].max()
-        previous_year = latest_year - 1
-        df = df[df['Year'].isin([previous_year, latest_year])]
     else:
-        latest_year = 2024
-        previous_year = 2023
+        # Generate artificial year if no date column exists
+        df['Year'] = np.random.choice([2023, 2024], size=len(df))
+
+    # Automatically detect latest two years
+    latest_year = df['Year'].max()
+    previous_year = latest_year - 1
+    df = df[df['Year'].isin([previous_year, latest_year])]
 
     # Split Data Correctly
     df_train = df[df['Year'] == previous_year]
@@ -111,14 +113,17 @@ if uploaded_file is not None:
     st.write(f"📊 **Growth % Compared to {previous_year}:** {growth_percent:.2f}%")
 
     # --------------------------
-    # Sales Graph
+    # Improved Sales Graph
     # --------------------------
     st.subheader("📊 Sales Graph")
     fig, ax = plt.subplots()
-    sns.lineplot(x=[previous_year, latest_year], y=[last_year_sales, predicted_sales], marker='o')
+    years = [previous_year, latest_year, latest_year + 1]
+    sales = [last_year_sales, y_train.sum(), predicted_sales]
+    sns.lineplot(x=years, y=sales, marker='o', linestyle='--', color='green')
     plt.xlabel("Year")
     plt.ylabel("Sales")
-    plt.title(f"Sales Trend {previous_year} → {latest_year+1}")
+    plt.title("📊 Sales Trend (Past vs Future)")
+    plt.xticks(years)
     st.pyplot(fig)
 
     st.success("✅ Prediction Completed In 5 Seconds")
