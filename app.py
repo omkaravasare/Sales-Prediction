@@ -2,19 +2,12 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
+import os
 import matplotlib.pyplot as plt
 import seaborn as sns
-
-# Load model, scaler, and selector
-@st.cache_resource
-
-def load_model():
-    model = joblib.load('model.pkl')
-    scaler = joblib.load('scaler.pkl')
-    selector = joblib.load('selector.pkl')
-    return model, scaler, selector
-
-model, scaler, selector = load_model()
+from xgboost import XGBRegressor
+from sklearn.preprocessing import StandardScaler
+from sklearn.feature_selection import SelectKBest, f_regression
 
 # Load dataset
 file_path = "walmart.csv"
@@ -41,6 +34,32 @@ def preprocess_data(df):
     df["Age"] = df["Age"].map(age_mapping)
 
     return df
+
+def train_and_save_model():
+    X = df.drop(columns=["Purchase"])
+    y = df["Purchase"]
+
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    selector = SelectKBest(score_func=f_regression, k=15)
+    X_selected = selector.fit_transform(X_scaled, y)
+
+    model = XGBRegressor(objective="reg:squarederror", random_state=42)
+    model.fit(X_selected, y)
+
+    # Save the model
+    joblib.dump(model, 'model.pkl')
+    joblib.dump(scaler, 'scaler.pkl')
+    joblib.dump(selector, 'selector.pkl')
+
+if not os.path.exists('model.pkl'):
+    train_and_save_model()
+
+# Load model, scaler, and selector
+model = joblib.load('model.pkl')
+scaler = joblib.load('scaler.pkl')
+selector = joblib.load('selector.pkl')
 
 # Sidebar inputs
 st.sidebar.header("Enter Data")
