@@ -24,10 +24,17 @@ if uploaded_file is not None:
     df = pd.read_csv(uploaded_file)
 
     # --------------------------
+    # ✅ Show Data Preview
+    # --------------------------
+    st.subheader("📊 Data Preview")
+    st.write(df.head())
+
+    # --------------------------
     # Data Preprocessing
     # --------------------------
+    st.subheader("⚙️ Data Preprocessing...")
     df.drop(['User_ID', 'Product_ID'], axis=1, inplace=True)
-    
+
     # Encode Categorical Variables
     label_encoder = LabelEncoder()
     df['Gender'] = label_encoder.fit_transform(df['Gender'])
@@ -51,8 +58,9 @@ if uploaded_file is not None:
     X_scaled = scaler.fit_transform(X)
 
     # --------------------------
-    # Train XGBoost Model
+    # ✅ Train XGBoost Model
     # --------------------------
+    st.subheader("📊 Training The Model...")
     model = XGBRegressor(n_estimators=1000, learning_rate=0.05, max_depth=10)
     model.fit(X_scaled, y)
 
@@ -60,7 +68,7 @@ if uploaded_file is not None:
     y_pred = model.predict(X_scaled)
 
     # --------------------------
-    # Calculate Accuracy
+    # ✅ Calculate Accuracy
     # --------------------------
     r2 = r2_score(y, y_pred)
     mae = mean_absolute_error(y, y_pred)
@@ -68,7 +76,7 @@ if uploaded_file is not None:
     rmse = np.sqrt(mse)
 
     # --------------------------
-    # Show Results
+    # ✅ Show Model Performance
     # --------------------------
     st.subheader("✅ Model Performance")
     st.write(f"💯 **R² Score (Accuracy):** {r2 * 100:.2f}%")
@@ -76,7 +84,7 @@ if uploaded_file is not None:
     st.write(f"📊 **Root Mean Squared Error (RMSE):** {rmse:.2f}")
 
     # --------------------------
-    # Feature Importance
+    # ✅ Feature Importance Graph
     # --------------------------
     st.subheader("💡 Feature Importance")
     fig, ax = plt.subplots()
@@ -85,7 +93,7 @@ if uploaded_file is not None:
     st.pyplot(fig)
 
     # --------------------------
-    # Future Sales Prediction
+    # ✅ Future Sales Prediction (2025-2030)
     # --------------------------
     st.subheader("📈 Future Sales Prediction (2025-2030)")
     future_sales = pd.DataFrame({
@@ -96,7 +104,21 @@ if uploaded_file is not None:
     st.write(future_sales)
 
     # --------------------------
-    # Download CSV
+    # ✅ Moving Average Graph
     # --------------------------
+    st.subheader("📊 Moving Average Sales Graph")
+    fig, ax = plt.subplots()
+    sns.lineplot(x=future_sales["Year"], y=future_sales["Predicted Sales"], marker='o', label='Future Sales')
+    plt.plot(future_sales["Year"], future_sales["Predicted Sales"].rolling(3).mean(), linestyle='dashed', color='red', label='Moving Average')
+    plt.xlabel("Year")
+    plt.ylabel("Projected Sales")
+    plt.title("Future Sales Prediction")
+    plt.legend()
+    st.pyplot(fig)
+
+    # --------------------------
+    # ✅ Download CSV
+    # --------------------------
+    st.subheader("💾 Download Predicted Sales Data")
     future_sales.to_csv("predicted_sales.csv", index=False)
     st.download_button("📥 Download CSV File", "predicted_sales.csv")
