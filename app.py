@@ -34,14 +34,22 @@ if uploaded_file is not None:
     df['City_Category'] = label_encoder.fit_transform(df['City_Category'])
     df['Stay_In_Current_City_Years'] = label_encoder.fit_transform(df['Stay_In_Current_City_Years'])
 
-    # Automatically detect the latest year based on data
-    latest_year = pd.to_datetime(df['Purchase_Date']).dt.year.max()
-    df['Year'] = pd.to_datetime(df['Purchase_Date']).dt.year
+    # Try to Automatically detect Date Column
+    date_column = None
+    for col in df.columns:
+        if 'date' in col.lower():
+            date_column = col
+            break
 
-    # Split Data for latest year - 1 and latest year
-    df = df[df['Year'].isin([latest_year - 1, latest_year])]
+    if date_column:
+        df[date_column] = pd.to_datetime(df[date_column], errors='coerce')
+        df['Year'] = df[date_column].dt.year
+        latest_year = df['Year'].max()
+        df = df[df['Year'].isin([latest_year - 1, latest_year])]
+    else:
+        latest_year = 2024  # Default if no date column found
 
-    X = df.drop(['Purchase', 'Year', 'Purchase_Date'], axis=1)
+    X = df.drop(['Purchase'], axis=1)
     y = df['Purchase']
 
     # Convert categorical data
@@ -59,8 +67,8 @@ if uploaded_file is not None:
     # --------------------------
     # Train XGBoost Model
     # --------------------------
-    st.write("⚙️ Training The Model... Please Wait 5-10 seconds...")
-    model = XGBRegressor(n_estimators=300, learning_rate=0.1, max_depth=6)
+    st.write("⚙️ Training The Model... Please Wait 5 Seconds...")
+    model = XGBRegressor(n_estimators=100, learning_rate=0.1, max_depth=6)
     model.fit(X_scaled, y)
 
     # Predict Sales for next year
@@ -104,7 +112,7 @@ if uploaded_file is not None:
     sns.lineplot(x=[latest_year-1, latest_year, latest_year+1], y=[last_year_sales, y.sum(), predicted_sales], marker='o')
     plt.xlabel("Year")
     plt.ylabel("Sales")
-    plt.title("Sales Trend {latest_year-1} → {latest_year+1}")
+    plt.title(f"Sales Trend {latest_year-1} → {latest_year+1}")
     st.pyplot(fig)
 
-    st.success("✅ Prediction Completed In 5-10 Seconds")
+    st.success("✅ Prediction Completed In 5 Seconds")
