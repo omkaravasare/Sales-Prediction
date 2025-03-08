@@ -11,8 +11,8 @@ import seaborn as sns
 # Web App Title
 # --------------------------
 st.title("📊 ERP Sales Prediction System")
-st.write("🚀 Predict Sales for 2025 Using Machine Learning")
-st.write("Upload your sales data (2023-2024) to forecast sales for 2025.")
+st.write("🚀 Predict Sales for Next Year Using Machine Learning")
+st.write("Upload your sales data (any year) to forecast sales for next year.")
 
 # --------------------------
 # File Upload
@@ -34,10 +34,14 @@ if uploaded_file is not None:
     df['City_Category'] = label_encoder.fit_transform(df['City_Category'])
     df['Stay_In_Current_City_Years'] = label_encoder.fit_transform(df['Stay_In_Current_City_Years'])
 
-    # Split Data for 2023-2024
-    df = df[df['Year'].isin([2023, 2024])]
+    # Automatically detect the latest year based on data
+    latest_year = pd.to_datetime(df['Purchase_Date']).dt.year.max()
+    df['Year'] = pd.to_datetime(df['Purchase_Date']).dt.year
 
-    X = df.drop(['Purchase', 'Year'], axis=1)
+    # Split Data for latest year - 1 and latest year
+    df = df[df['Year'].isin([latest_year - 1, latest_year])]
+
+    X = df.drop(['Purchase', 'Year', 'Purchase_Date'], axis=1)
     y = df['Purchase']
 
     # Convert categorical data
@@ -59,10 +63,10 @@ if uploaded_file is not None:
     model = XGBRegressor(n_estimators=300, learning_rate=0.1, max_depth=6)
     model.fit(X_scaled, y)
 
-    # Predict Sales for 2025
-    future_data = X.tail(1)  # Take last available data
+    # Predict Sales for next year
+    future_data = X.tail(1)
     future_sales = pd.DataFrame({
-        "Year": [2025],
+        "Year": [latest_year + 1],
         "Predicted Sales": model.predict(future_data)[0]
     })
 
@@ -88,19 +92,19 @@ if uploaded_file is not None:
     # --------------------------
     # Future Sales Prediction
     # --------------------------
-    st.subheader("📈 Sales Prediction for 2025")
-    st.write(f"💸 **Predicted Sales (2025):** ₹{predicted_sales:,.2f}")
-    st.write(f"📊 **Growth % Compared to 2024:** {growth_percent:.2f}%")
+    st.subheader("📈 Sales Prediction for Next Year")
+    st.write(f"💸 **Predicted Sales ({latest_year + 1}):** ₹{predicted_sales:,.2f}")
+    st.write(f"📊 **Growth % Compared to {latest_year}:** {growth_percent:.2f}%")
 
     # --------------------------
     # Sales Graph
     # --------------------------
     st.subheader("📊 Sales Graph")
     fig, ax = plt.subplots()
-    sns.lineplot(x=[2023, 2024, 2025], y=[last_year_sales, y.sum(), predicted_sales], marker='o')
+    sns.lineplot(x=[latest_year-1, latest_year, latest_year+1], y=[last_year_sales, y.sum(), predicted_sales], marker='o')
     plt.xlabel("Year")
     plt.ylabel("Sales")
-    plt.title("Sales Trend 2023-2025")
+    plt.title("Sales Trend {latest_year-1} → {latest_year+1}")
     st.pyplot(fig)
 
     st.success("✅ Prediction Completed In 5-10 Seconds")
