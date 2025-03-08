@@ -42,9 +42,18 @@ if uploaded_file is not None:
     X = df.drop('Purchase', axis=1)
     y = df['Purchase']
 
-    # Scale Data
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
+# Convert categorical data
+for col in X.columns:
+    if X[col].dtype == 'object':
+        X[col] = LabelEncoder().fit_transform(X[col])
+
+# Fill missing values
+X.fillna(0, inplace=True)
+
+# Scale Data
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
 
     # --------------------------
     # Train XGBoost Model
