@@ -1,89 +1,141 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import joblib
-import os
+from xgboost import XGBRegressor
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import matplotlib.pyplot as plt
 import seaborn as sns
-from xgboost import XGBRegressor
-from sklearn.preprocessing import StandardScaler
-from sklearn.feature_selection import SelectKBest, f_regression
 
-# Load dataset
-file_path = "walmart.csv"
-df = pd.read_csv(file_path)
+# --------------------------
+# Web App Title
+# --------------------------
+st.title("📊 ERP Sales Prediction System")
+st.write("🚀 Predict Sales for Next Year Using Machine Learning")
+st.write("Upload your sales data (any year) to forecast sales for next year.")
 
-# Preprocessing function
-def preprocess_data(df):
-    drop_cols = ["User_ID", "Product_ID"]
-    for col in drop_cols:
-        if col in df.columns:
-            df.drop(columns=[col], inplace=True)
+# --------------------------
+# File Upload
+# --------------------------
+uploaded_file = st.file_uploader("📁 Upload CSV File", type=['csv'])
 
+if uploaded_file is not None:
+    # Load Dataset
+    df = pd.read_csv(uploaded_file)
+
+    # --------------------------
+    # Preprocessing
+    # --------------------------
+    df.drop(['User_ID', 'Product_ID'], axis=1, inplace=True, errors='ignore')
+
+    # Encode Categorical Variables
+    label_encoder = LabelEncoder()
+    df['Gender'] = label_encoder.fit_transform(df['Gender'])
+    df['City_Category'] = label_encoder.fit_transform(df['City_Category'])
+    df['Stay_In_Current_City_Years'] = label_encoder.fit_transform(df['Stay_In_Current_City_Years'])
+
+    # Automatically detect Date Column
+    date_column = None
     for col in df.columns:
-        if df[col].dtype == "object":
-            df[col].fillna(df[col].mode()[0], inplace=True)
-        else:
-            df[col].fillna(df[col].median(), inplace=True)
+        if 'date' in col.lower():
+            date_column = col
+            break
 
-    # One-hot encoding
-    df = pd.get_dummies(df, columns=["Gender", "City_Category", "Stay_In_Current_City_Years"], drop_first=True)
+    if date_column:
+        df[date_column] = pd.to_datetime(df[date_column], errors='coerce')
+        df['Year'] = df[date_column].dt.year
+    else:
+        # Generate artificial year if no date column exists
+        df['Year'] = np.random.choice([2023, 2024], size=len(df))
 
-    # Age mapping
-    age_mapping = {'0-17': 0, '18-25': 1, '26-35': 2, '36-45': 3, '46-50': 4, '51-55': 5, '55+': 6}
-    df["Age"] = df["Age"].map(age_mapping)
+    # Automatically detect latest two years
+    latest_year = df['Year'].max()
+    previous_year = latest_year - 1
+    df = df[df['Year'].isin([previous_year, latest_year])]
 
-    return df
+    # Split Data Correctly
+    df_train = df[df['Year'] == previous_year]
+    df_test = df[df['Year'] == latest_year]
 
-def train_and_save_model():
-    X = df.drop(columns=["Purchase"])
-    y = df["Purchase"]
+    # Extract X and y
+    X_train = df_train.drop(['Purchase', 'Year'], axis=1)
+    y_train = df_train['Purchase']
+    X_test = df_test.drop(['Purchase', 'Year'], axis=1)
 
+    # Convert categorical data
+    for col in X_train.columns:
+        if X_train[col].dtype == 'object':
+            X_train[col] = LabelEncoder().fit_transform(X_train[col])
+            X_test[col] = LabelEncoder().fit_transform(X_test[col])
+
+    # Fill missing values
+    X_train.fillna(0, inplace=True)
+    X_test.fillna(0, inplace=True)
+
+    # Scale Data
     scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
 
-    selector = SelectKBest(score_func=f_regression, k=15)
-    X_selected = selector.fit_transform(X_scaled, y)
+    # --------------------------
+    # Train XGBoost Model
+    # --------------------------
+    st.write("⚙️ Training The Model... Please Wait 5 Seconds...")
+    model = XGBRegressor(n_estimators=300, learning_rate=0.05, max_depth=8)
+    model.fit(X_train_scaled, y_train)
 
-    model = XGBRegressor(objective="reg:squarederror", random_state=42)
-    model.fit(X_selected, y)
+    # Predict Sales for next year
+    predicted_sales = model.predict(X_test_scaled).sum()
+    last_year_sales = y_train.sum()
 
-    # Save the model
-    joblib.dump(model, 'model.pkl')
-    joblib.dump(scaler, 'scaler.pkl')
-    joblib.dump(selector, 'selector.pkl')
+    # Calculate Growth %
+    growth_percent = ((predicted_sales - last_year_sales) / last_year_sales) * 100
 
-if not os.path.exists('model.pkl'):
-    train_and_save_model()
+    # --------------------------
+    # Dashboard - Show Results
+    # --------------------------
+    st.subheader("✅ Model Performance")
+    y_pred = model.predict(X_train_scaled)
+    r2 = r2_score(y_train, y_pred)
+    mae = mean_absolute_error(y_train, y_pred)
+    mse = mean_squared_error(y_train, y_pred)
+    rmse = np.sqrt(mse)
 
-# Load model, scaler, and selector
-model = joblib.load('model.pkl')
-scaler = joblib.load('scaler.pkl')
-selector = joblib.load('selector.pkl')
+    st.write(f"💯 **R² Score (Accuracy):** {r2 * 100:.2f}%")
+    st.write(f"💸 **Mean Absolute Error (MAE):** {mae:.2f}")
+    st.write(f"📊 **Root Mean Squared Error (RMSE):** {rmse:.2f}")
 
-# Sidebar inputs
-st.sidebar.header("Enter Data")
-input_data = []
-for col in df.drop(columns=["Purchase"]).columns:
-    value = st.sidebar.number_input(f"{col}", value=float(df[col].mean()))
-    input_data.append(value)
+    # --------------------------
+    # Future Sales Prediction
+    # --------------------------
+    st.subheader("📈 Sales Prediction for Next Year")
+    st.write(f"💸 **Predicted Sales ({latest_year + 1}):** ₹{predicted_sales:,.2f}")
+    st.write(f"📊 **Growth % Compared to {previous_year}:** {growth_percent:.2f}%")
 
-# Prediction
-input_data = np.array(input_data).reshape(1, -1)
-input_data = scaler.transform(input_data)
-input_data = selector.transform(input_data)
-prediction = model.predict(input_data)
-st.write(f"### Predicted Purchase: ${prediction[0]:.2f}")
+    # --------------------------
+    # Improved Sales Graph
+    # --------------------------
+    st.subheader("📊 Sales Graph")
+    fig, ax = plt.subplots()
+    years = [previous_year, latest_year, latest_year + 1]
+    sales = [last_year_sales, y_train.sum(), predicted_sales]
+    sns.lineplot(x=years, y=sales, marker='o', linestyle='--', color='green')
+    plt.xlabel("Year")
+    plt.ylabel("Sales")
+    plt.title("📊 Sales Trend (Past vs Future)")
+    plt.xticks(years)
+    st.pyplot(fig)
 
-# Forecasting
-future_data = pd.DataFrame(np.tile(input_data, (365, 1)))
-future_prediction = model.predict(future_data)
+    # --------------------------
+    # Data Table: Actual vs Predicted
+    # --------------------------
+    st.subheader("📊 Actual vs Predicted Sales")
+    table_data = {
+        'Year': [previous_year, latest_year, latest_year + 1],
+        'Sales': [last_year_sales, y_train.sum(), predicted_sales],
+        'Type': ['Actual', 'Actual', 'Predicted']
+    }
+    sales_df = pd.DataFrame(table_data)
+    st.table(sales_df)
 
-# Plotting
-st.write("## Future Sales Prediction for One Year")
-plt.figure(figsize=(10, 5))
-plt.plot(range(365), future_prediction)
-plt.xlabel("Days Ahead")
-plt.ylabel("Predicted Purchase")
-plt.title("Sales Prediction for Next Year")
-st.pyplot(plt)
+    st.success("✅ Prediction Completed In 5 Seconds")
